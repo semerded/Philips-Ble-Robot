@@ -131,27 +131,24 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                   stream: controller.scanResult,
                   builder: (context, snapshot) {
                     if (snapshot.hasData) {
-                      // return Expanded(
-                        // child:
-                         return SizedBox(
+                      return Expanded(
+                        child: SizedBox(
                           height: 200.0,
-                          child: 
-                           ListView.builder(
-                            // itemCount: snapshot.data!.length,
+                          child: ListView.builder(
+                            itemCount: snapshot.data!.length,
                             itemBuilder: (context, index) {
-                              // final data = snapshot.data![index];
-                              return const Card(
+                              final data = snapshot.data![index];
+                              return Card(
                                 elevation: 2,
                                 child: ListTile(
-                                  title: Text("hello"),
-                                  // title: Text(data.device.name),
-                                  // subtitle: Text(data.device.id.id),
-                                  // trailing: Text(data.rssi.toString()),
+                                  title: Text(data.device.name.toString()),
+                                  subtitle: Text(data.device.id.id.toString()),
+                                  trailing: Text(data.rssi.toString()),
                                 ),
                               );
                             },
                           ),
-                        // ),
+                        ),
                       );
                     } else {
                       return const Center(
@@ -161,7 +158,9 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                   },
                 ),
                 ElevatedButton(
-                  onPressed: () => controller.scanDevices(),
+                  onPressed: () => {
+                      controller.scanDevices()
+                      },
                   child: const Text("SCAN"),
                 )
               ],
