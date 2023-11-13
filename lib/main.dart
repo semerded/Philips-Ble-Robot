@@ -6,13 +6,18 @@ import 'package:philips_robot/ble_controller.dart';
 // global vars
 double currentSliderValueLeft = 0;
 double currentSliderValueRight = 0;
+bool bleRobotFound = false;
+String bleRobotInfo = "Search for the robot";
+const String bluetoothRobotName = "ble-robot";
 
 void main() {
   // WidgetsFlutterBinding.ensureInitialized();
   // SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft])
   //     .then((value) {
-  runApp(const MainApp());
+  // runApp(const MainApp());
   // });
+
+  runApp(const MainApp());
 }
 
 class MainApp extends StatelessWidget {
@@ -22,6 +27,7 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       home: BlueToothScreen(),
+      // home: ControlSliders(),
     );
   }
 }
@@ -51,7 +57,6 @@ class _ControlSlidersState extends State<ControlSliders> {
                 activeColor: Colors.blue,
                 inactiveColor: Colors.blue,
                 divisions: 200,
-                label: currentSliderValueLeft.round().toString(),
                 onChanged: (double value) {
                   setState(() {
                     currentSliderValueLeft = value.roundToDouble();
@@ -90,10 +95,14 @@ class _ControlSlidersState extends State<ControlSliders> {
                 activeColor: Colors.blue,
                 inactiveColor: Colors.blue,
                 divisions: 200,
-                label: currentSliderValueRight.toString(),
                 onChanged: (double value) {
                   setState(() {
                     currentSliderValueRight = value.roundToDouble();
+                  });
+                },
+                onChangeEnd: (double value) {
+                  setState(() {
+                    currentSliderValueRight = 0;
                   });
                 },
               ),
@@ -102,6 +111,24 @@ class _ControlSlidersState extends State<ControlSliders> {
         ],
       ),
     );
+  }
+}
+
+highlightRobotConnection(String robotName) {
+  if (robotName == bluetoothRobotName) {
+    return Colors.green;
+  }
+  return Colors.white;
+}
+
+connectToBluetooth(device) async {
+  print(device);
+  try {
+    await device.connect();
+  } catch (e) {
+    if (e != 'already_connected') {
+      throw e;
+    }
   }
 }
 
@@ -126,6 +153,12 @@ class BlueToothScreenState extends State<BlueToothScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                Center(
+                  child: Text(
+                    bleRobotInfo,
+                    style: const TextStyle(fontSize: 20),
+                  ),
+                ),
                 StreamBuilder<List<ScanResult>>(
                   stream: controller.scanResult,
                   builder: (context, snapshot) {
@@ -136,10 +169,29 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                           child: ListView.builder(
                             itemCount: snapshot.data!.length,
                             itemBuilder: (context, index) {
+                              if (snapshot.data![index].device.name.toString() ==
+                                  bluetoothRobotName) {
+                                // switch ble-robot to position 0 in list
+                                var tempDataStorage = snapshot.data![0];
+                                snapshot.data![0] = snapshot.data![index];
+                                snapshot.data![index] = tempDataStorage;
+                                bleRobotFound = true;
+                                Future.delayed(Duration.zero, () async {
+                                  setState(() {
+                                    bleRobotInfo =
+                                        "Robot found! Click to connect";
+                                  });
+                                });
+                              }
                               final data = snapshot.data![index];
+
                               return Card(
-                                elevation: 2,
+                                elevation: 3,
                                 child: ListTile(
+                                  onTap: () =>
+                                      {connectToBluetooth(data.device)},
+                                  tileColor: highlightRobotConnection(
+                                      data.device.name.toString()),
                                   title: Text(data.device.name.toString()),
                                   subtitle: Text(data.device.id.id.toString()),
                                   trailing: Text(data.rssi.toString()),
@@ -157,9 +209,12 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                   },
                 ),
                 ElevatedButton(
-                  onPressed: () => {
-                      controller.scanDevices()
-                      },
+                  onPressed: () {
+                    controller.scanDevices();
+                    setState(() {
+                      bleRobotInfo = "Searching...";
+                    });
+                  },
                   child: const Text("SCAN"),
                 )
               ],
