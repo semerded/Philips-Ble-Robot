@@ -4,7 +4,6 @@ import 'package:permission_handler/permission_handler.dart';
 
 class BleController extends GetxController {
   FlutterBlue ble = FlutterBlue.instance;
-
   Future scanDevices() async {
     if (await Permission.bluetoothScan.request().isGranted) {
       if (await Permission.bluetoothConnect.request().isGranted) {
@@ -13,5 +12,6 @@ class BleController extends GetxController {
       }
     }
   }
+
   Stream<List<ScanResult>> get scanResult => ble.scanResults;
 }
