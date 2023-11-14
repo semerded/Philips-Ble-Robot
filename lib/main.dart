@@ -6,9 +6,10 @@ import 'package:philips_robot/ble_controller.dart';
 // global vars
 double currentSliderValueLeft = 0;
 double currentSliderValueRight = 0;
-bool bleRobotFound = false;
 String bleRobotInfo = "Search for the robot";
 const String bluetoothRobotName = "ble-robot";
+List robotList = [];
+int counter = 0;
 
 void main() {
   // WidgetsFlutterBinding.ensureInitialized();
@@ -121,13 +122,24 @@ highlightRobotConnection(String robotName) {
   return Colors.white;
 }
 
+int countRobotsFound(connections) {
+  int robotsFound = 0;
+  for (var connection in connections) {
+    if (connection.device.name.toString() == bluetoothRobotName) {
+      robotsFound++;
+    }
+  }
+
+  return robotsFound;
+}
+
 connectToBluetooth(device) async {
   print(device);
   try {
     await device.connect();
   } catch (e) {
     if (e != 'already_connected') {
-      throw e;
+      rethrow;
     }
   }
 }
@@ -140,6 +152,8 @@ class BlueToothScreen extends StatefulWidget {
 }
 
 class BlueToothScreenState extends State<BlueToothScreen> {
+  int selectedRobot = 0;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -159,60 +173,112 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                     style: const TextStyle(fontSize: 20),
                   ),
                 ),
-                StreamBuilder<List<ScanResult>>(
-                  stream: controller.scanResult,
-                  builder: (context, snapshot) {
-                    if (snapshot.hasData) {
-                      return Expanded(
-                        child: SizedBox(
-                          height: 200.0,
-                          child: ListView.builder(
-                            itemCount: snapshot.data!.length,
-                            itemBuilder: (context, index) {
-                              if (snapshot.data![index].device.name.toString() ==
-                                  bluetoothRobotName) {
-                                // switch ble-robot to position 0 in list
-                                var tempDataStorage = snapshot.data![0];
-                                snapshot.data![0] = snapshot.data![index];
-                                snapshot.data![index] = tempDataStorage;
-                                bleRobotFound = true;
-                                Future.delayed(Duration.zero, () async {
-                                  setState(() {
-                                    bleRobotInfo =
-                                        "Robot found! Click to connect";
-                                  });
-                                });
-                              }
-                              final data = snapshot.data![index];
+                Expanded(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      // itemBuilder: (BuildContext context, int dex) {
+                      (() {
+                        if (robotList.isNotEmpty) {
+                          return Expanded(
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: robotList.length,
+                              itemBuilder: (context, index) {
+                                return ListTile(
+                                  tileColor: selectedRobot == index
+                                      ? Colors.blue
+                                      : Colors.green,
+                                  onTap: () {
+                                    setState(
+                                      () {
+                                        selectedRobot = index;
+                                      },
+                                    );
+                                  },
+                                  title: Text(
+                                      robotList[index].device.name.toString()),
+                                  subtitle: Text(
+                                      robotList[index].device.id.id.toString()),
+                                  trailing:
+                                      Text(robotList[index].rssi.toString()),
+                                );
+                              },
+                            ),
+                          );
+                        } else {
+                          return Container();
+                        }
+                      }()),
 
-                              return Card(
-                                elevation: 3,
-                                child: ListTile(
-                                  onTap: () =>
-                                      {connectToBluetooth(data.device)},
-                                  tileColor: highlightRobotConnection(
-                                      data.device.name.toString()),
-                                  title: Text(data.device.name.toString()),
-                                  subtitle: Text(data.device.id.id.toString()),
-                                  trailing: Text(data.rssi.toString()),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      );
-                    } else {
-                      return const Center(
-                        child: Text("No Device Found"),
-                      );
-                    }
-                  },
+                      StreamBuilder<List<ScanResult>>(
+                        stream: controller.scanResult,
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData) {
+                            return Expanded(
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: snapshot.data!.length,
+                                itemBuilder: (context, index) {
+                                  // if (FlutterBlue.instance.isScanning.first) {
+                                  if (counter >= 1000) {
+                                    for (var bleDevice in snapshot.data!) {
+                                      if (bleDevice.device.name.toString() ==
+                                          bluetoothRobotName) {
+                                        if (!robotList.contains(bleDevice)) {
+                                          robotList.add(bleDevice);
+                                        }
+                                      }
+                                      Future.delayed(Duration.zero, () async {
+                                        setState(() {
+                                          bleRobotInfo =
+                                              "Robot found! Click to connect";
+                                        });
+                                      });
+                                    }
+                                    counter = 0;
+                                  }
+                                  counter++;
+
+                                  final data = snapshot.data![index];
+                                  if (data.device.name.toString() ==
+                                      bluetoothRobotName) {
+                                    return Container();
+                                  }
+
+                                  return Card(
+                                    elevation: 3,
+                                    child: ListTile(
+                                      onTap: () =>
+                                          {connectToBluetooth(data.device)},
+                                      tileColor: highlightRobotConnection(
+                                          data.device.name.toString()),
+                                      title: Text(data.device.name.toString()),
+                                      subtitle:
+                                          Text(data.device.id.id.toString()),
+                                      trailing: Text(data.rssi.toString()),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          } else {
+                            return const Center(
+                              child: Text("No Device Found"),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: () {
                     controller.scanDevices();
                     setState(() {
-                      bleRobotInfo = "Searching...";
+                      bleRobotInfo = "Searching for your robot...";
+                      robotList = [];
                     });
                   },
                   child: const Text("SCAN"),
