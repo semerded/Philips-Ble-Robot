@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue/flutter_blue.dart';
 import 'package:get/get.dart';
 import 'package:philips_robot/ble_controller.dart';
@@ -10,6 +13,19 @@ const String bluetoothRobotName = "ble-robot";
 List robotList = [];
 int counter = 0;
 int selectedRobot = -1;
+bool robotConnected = false;
+var connectedRobotDevice;
+
+const String speedMotorLeft = "c9261765-1076-41ac-82d7-a454e801bd9a";
+const String speedMotorRight = "c9261765-1076-41ac-82d7-a454e801bd9b";
+const String directionMotorLeft = "c9261765-1076-41ac-82d7-a454e801bd9c";
+const String directionMotorRight = "c9261765-1076-41ac-82d7-a454e801bd9d";
+const String motorStop = "c9261765-1076-41ac-82d7-a454e801bd9e";
+const String inputSucceed = "c9261765-1076-41ac-82d7-a454e801bd9f";
+
+var jsonString = File("BleCharacteristics.").readAsStringSync(); // open json file en lees als string
+    final Map<String, dynamic> jsonmap =
+        decoder.convert(jsonString);
 
 // offset controll of main listview
 ScrollController _scrollController = ScrollController();
@@ -17,25 +33,18 @@ double mainListViewScrollOffset = 0;
 // }
 
 void main() {
-  // WidgetsFlutterBinding.ensureInitialized();
-  // SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft])
-  //     .then((value) {
-  // runApp(const MainApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  // SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.portraitUp]).then((value) {
+  //   runApp(const MaterialApp(
+  //     title: 'Ble Robot',
+  //     home: ControlSliders(),
+  //   ));
   // });
 
-  runApp(const MainApp());
-}
-
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: BlueToothScreen(),
-      // home: ControlSliders(),
-    );
-  }
+  runApp(const MaterialApp(
+    title: "Ble Robot Controller",
+    home: ControlSliders(),
+  ));
 }
 
 class ControlSliders extends StatefulWidget {
@@ -68,12 +77,31 @@ class _ControlSlidersState extends State<ControlSliders> {
                     currentSliderValueLeft = value.roundToDouble();
                   });
                 },
+                 onChangeEnd: (double value) {
+                  setState(() {
+                    currentSliderValueLeft = 0;
+                  });
+                },
               ),
             ),
           ),
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              FloatingActionButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) {
+                      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+                      return const BlueToothScreen();
+                    }),
+                  );
+                },
+                backgroundColor: Colors.blue,
+                mini: true,
+                child: const Icon(Icons.bluetooth),
+              ),
               Text("$currentSliderValueLeft, $currentSliderValueRight"),
               TextButton(
                   style: ButtonStyle(foregroundColor: MaterialStateProperty.all<Color>(Colors.black), backgroundColor: MaterialStateProperty.all<Color>(Colors.red)),
@@ -116,13 +144,6 @@ class _ControlSlidersState extends State<ControlSliders> {
   }
 }
 
-highlightRobotConnection(String robotName) {
-  if (robotName == bluetoothRobotName) {
-    return Colors.green;
-  }
-  return Colors.white;
-}
-
 int countRobotsFound(connections) {
   int robotsFound = 0;
   for (var connection in connections) {
@@ -130,23 +151,15 @@ int countRobotsFound(connections) {
       robotsFound++;
     }
   }
-
   return robotsFound;
 }
 
-connectToBluetooth(device) async {
-  print(device);
-  try {
-    await device.connect();
-  } catch (e) {
-    if (e != 'already_connected') {
-      rethrow;
-    }
-  }
-}
-
-connectTo() {
-  print(true);
+connectTo(robot) async {
+  // FlutterBlue ble = FlutterBlue.instance;
+  // await BluetoothDevice.fromProto(robot).connect();
+  await robot.connect(timeout: const Duration(seconds: 15), autoConnect: false);
+  connectedRobotDevice = robot;
+  robotConnected = true;
 }
 
 class BlueToothScreen extends StatefulWidget {
@@ -164,6 +177,17 @@ class BlueToothScreenState extends State<BlueToothScreen> {
     return Scaffold(
         appBar: AppBar(
           title: const Text("connect to your bluetooth robot"),
+          actions: [
+            FloatingActionButton(
+              onPressed: () {
+                SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft]);
+                Navigator.pop(context);
+              },
+              backgroundColor: Colors.red,
+              mini: true,
+              child: const Icon(Icons.cancel_outlined),
+            )
+          ],
         ),
         body: GetBuilder<BleController>(
           init: BleController(),
@@ -182,7 +206,6 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                   // listen to scroll updates
                   NotificationListener(
                     onNotification: (notification) {
-                      print(notification);
                       if (notification is ScrollEndNotification) {
                         setState(() {
                           mainListViewScrollOffset = _scrollController.position.pixels;
@@ -226,7 +249,7 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                                           selectedRobot == index
                                               ? ElevatedButton(
                                                   onPressed: () {
-                                                    connectTo();
+                                                    connectTo(robotList[index].device);
                                                   },
                                                   style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
                                                   child: const Text("Connect to robot!"),
@@ -257,7 +280,7 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                                     itemCount: snapshot.data!.length,
                                     itemBuilder: (context, index) {
                                       // if (FlutterBlue.instance.isScanning.first) {
-                                      if (counter >= 1000) {
+                                      if (counter >= 1) {
                                         for (var bleDevice in snapshot.data!) {
                                           if (bleDevice.device.name.toString() == bluetoothRobotName) {
                                             if (!robotList.contains(bleDevice)) {
@@ -268,9 +291,9 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                                             Future.delayed(
                                               Duration.zero,
                                               () async {
-                                                setState(() {
-                                                  bleRobotInfo = "Robot found! Click to connect";
-                                                });
+                                                bleRobotInfo = "Robot found! Click to connect";
+
+                                                setState(() {});
                                               },
                                             );
                                           }
@@ -287,8 +310,7 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                                       return Card(
                                         elevation: 3,
                                         child: ListTile(
-                                          onTap: () => {connectToBluetooth(data.device)},
-                                          tileColor: highlightRobotConnection(data.device.name.toString()),
+                                          // onLongPress: () {connectTo(data.device.);},
                                           title: Text(data.device.name.toString()),
                                           subtitle: Text(data.device.id.id.toString()),
                                           trailing: Text(data.rssi.toString()),
@@ -308,17 +330,83 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                       ),
                     ),
                   ),
-                  ElevatedButton(
-                    onPressed: () {
-                      robotList = [];
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          robotList = [];
+                          selectedRobot = -1;
+                          controller.scanDevices();
+                          setState(() {
+                            bleRobotInfo = "Searching for your robot...";
+                          });
+                        },
+                        child: const Text("SCAN"),
+                      ),
+                      robotConnected == true
+                          ? ElevatedButton(
+                              onPressed: () {
+                                connectedRobotDevice.disconnect();
+                              },
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                              child: const Text(
+                                "Disconnect",
+                              ))
+                          : Container(),
+                      ElevatedButton(
+                          onPressed: () async {
+                            var robotServices = await connectedRobotDevice.discoverServices();
 
-                      controller.scanDevices();
-                      setState(() {
-                        bleRobotInfo = "Searching for your robot...";
-                      });
-                    },
-                    child: const Text("SCAN"),
-                  ),
+                            for (var service in robotServices) {
+                              if (service.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd99") {
+                                // print(service.characteristics);
+                                var characteristics = service.characteristics;
+                                for (BluetoothCharacteristic char in characteristics) {
+                                  if (char.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd9c") {
+                                    await char.write([0x01], withoutResponse: true);
+                                  }
+                                  if (char.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd9f") {
+                                    await char.setNotifyValue(true);
+                                    char.value.listen((value) {
+                                      print(value);
+                                    });
+                                  if (char.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd9a") {}
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          child: const Text("data")),
+                      ElevatedButton(
+                          onPressed: () async {
+                            var robotServices = await connectedRobotDevice.discoverServices();
+
+                            for (var service in robotServices) {
+                              if (service.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd99") {
+                                // print(service.characteristics);
+                                var characteristics = service.characteristics;
+                                for (BluetoothCharacteristic char in characteristics) {
+                                  print(char);
+                                  print("-----------------------");
+
+                                  if (char.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd9a") {
+                                    await char.write([0x32], withoutResponse: true);
+                                  }
+
+                                  if (char.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd9f") {
+                                    await char.setNotifyValue(true);
+                                    char.value.listen((value) {
+                                      print(value);
+                                    });
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          child: const Text("data2"))
+                    ],
+                  )
                 ],
               ),
             );
