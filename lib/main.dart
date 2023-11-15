@@ -39,7 +39,7 @@ double mainListViewScrollOffset = 0;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.portraitUp]);
+  SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft]);
 
   runApp(const MaterialApp(
     title: "Ble Robot Controller",
@@ -63,6 +63,7 @@ void updateMotorLeft(double speed) async {
     currentDirection = 1;
   } else {
     currentDirection = 0;
+    speed = 0;
   }
   speed = speed.abs();
 
@@ -77,9 +78,16 @@ void updateMotorLeft(double speed) async {
         callReady = false;
 
         inputSucceed?.value.listen((value) {
+          try {
+          if (value.first == 0) {
+         
           callReady = true;
           updateDirectionLeftPending = false;
           leftDirection = currentDirection;
+          }
+          } catch (e) {
+            //
+          }
         });
       }
     }
@@ -91,8 +99,14 @@ void updateMotorLeft(double speed) async {
         callReady = false;
 
         inputSucceed?.value.listen((value) {
-          callReady = true;
-          previouseLeftUpdateValue = speed;
+            try {
+          if (value.first == 0) {
+            callReady = true;
+            previouseLeftUpdateValue = speed;
+          }
+            } catch (e) {
+              //
+            }
         });
       }
     }
@@ -110,9 +124,9 @@ void updateMotorRight(double speed) async {
     currentDirection = 1;
   } else {
     currentDirection = 0;
+    speed = 0;
   }
   speed = speed.abs();
-  
 
   if (rightDirection != currentDirection) {
     updateDirectionRightPending = true;
@@ -124,9 +138,16 @@ void updateMotorRight(double speed) async {
         callReady = false;
 
         inputSucceed?.value.listen((value) {
+          try {
+          if (value.first == 0) {
+
           callReady = true;
           updateDirectionRightPending = false;
           rightDirection = currentDirection;
+          }
+          } catch (e) {
+            //
+          }
         });
       }
     }
@@ -138,8 +159,14 @@ void updateMotorRight(double speed) async {
         callReady = false;
 
         inputSucceed?.value.listen((value) {
-          callReady = true;
-          previouseRightUpdateValue = speed;
+        try {
+          if (value.first == 0) {
+            callReady = true;
+            previouseRightUpdateValue = speed;
+          }
+        } catch (e) {
+          //
+        }
         });
       }
     }
@@ -149,8 +176,32 @@ void updateMotorRight(double speed) async {
   return;
 }
 
+// void stopMotor(motorL, motorR) async {
+//   while (true) {
+ 
+//     if (await waitFor(callReady)) {
+//       if (motorL) {
+//         await directionMotorLeft?.write([0x00]);
+//         }
+//       if (motorR) {
+//         await directionMotorRight?.write([0x00]);
+//       }
+//       inputSucceed?.value.listen((value) {
+//         try {
+//           if (value.first == 0) {
+//             callReady = true;
+//           }
+//         } catch (e) {
+//           //
+//         }
+
+//       });
+//     }
+//   }
+// }
 class ControlSliders extends StatefulWidget {
   const ControlSliders({super.key});
+  
 
   @override
   State<ControlSliders> createState() => _ControlSlidersState();
@@ -175,7 +226,7 @@ class _ControlSlidersState extends State<ControlSliders> {
                 inactiveColor: Colors.blue,
                 divisions: 200,
                 onChanged: (double value) {
-                  Future(() => updateMotorLeft(currentSliderValueLeft));
+              updateMotorLeft(currentSliderValueLeft);
 
                   setState(() {
                     currentSliderValueLeft = value.roundToDouble();
@@ -185,7 +236,7 @@ class _ControlSlidersState extends State<ControlSliders> {
                   setState(() {
                     currentSliderValueLeft = 0;
                   });
-                  Future(() => updateMotorLeft(currentSliderValueLeft));
+                  Future(() async => updateMotorRight(0));
                 },
               ),
             ),
@@ -198,6 +249,7 @@ class _ControlSlidersState extends State<ControlSliders> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) {
+                      
                       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
                       return const BlueToothScreen();
                     }),
@@ -234,13 +286,13 @@ class _ControlSlidersState extends State<ControlSliders> {
                   setState(() {
                     currentSliderValueRight = value.roundToDouble();
                   });
-                  Future(() => updateMotorRight(currentSliderValueRight));
+                  updateMotorRight(currentSliderValueRight);
                 },
                 onChangeEnd: (double value) {
                   setState(() {
                     currentSliderValueRight = 0;
                   });
-                  Future(() => updateMotorRight(currentSliderValueRight));
+                  Future(() async => updateMotorRight(0));
                 },
               ),
             ),
@@ -265,6 +317,13 @@ connectTo(robot) async {
   // FlutterBlue ble = FlutterBlue.instance;
   // await BluetoothDevice.fromProto(robot).connect();
   await robot.connect(timeout: const Duration(seconds: 15), autoConnect: false);
+
+    robot.mtu.elementAt(1).then((mtu) {
+      mtu = mtu < 23 ? 20 : mtu - 3; // failsafe by always assuming an ATT MTU and not a DATA MTU
+      // do your service discovery
+      robot.discoverServices();
+    });
+await robot.requestMtu(512);
   var robotServices = await robot.discoverServices();
   for (var service in robotServices) {
     if (service.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd99") {
@@ -289,7 +348,6 @@ connectTo(robot) async {
 
   connectedRobotDevice = robot;
   robotConnected = true;
-  // await directionMotorLeft?.write([1], withoutResponse: true);
 }
 
 class BlueToothScreen extends StatefulWidget {
