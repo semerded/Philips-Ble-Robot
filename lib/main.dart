@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue/flutter_blue.dart';
@@ -12,20 +10,27 @@ double currentSliderValueRight = 0;
 const String bluetoothRobotName = "ble-robot";
 List robotList = [];
 int counter = 0;
+int leftDirection = 0;
+int rightDirection = 0;
 int selectedRobot = -1;
 bool robotConnected = false;
 var connectedRobotDevice;
+bool callReady = true;
 
-const String speedMotorLeft = "c9261765-1076-41ac-82d7-a454e801bd9a";
-const String speedMotorRight = "c9261765-1076-41ac-82d7-a454e801bd9b";
-const String directionMotorLeft = "c9261765-1076-41ac-82d7-a454e801bd9c";
-const String directionMotorRight = "c9261765-1076-41ac-82d7-a454e801bd9d";
-const String motorStop = "c9261765-1076-41ac-82d7-a454e801bd9e";
-const String inputSucceed = "c9261765-1076-41ac-82d7-a454e801bd9f";
+bool updateDirectionLeftPending = true;
+bool updateDirectionRightPending = true;
 
-var jsonString = File("BleCharacteristics.").readAsStringSync(); // open json file en lees als string
-    final Map<String, dynamic> jsonmap =
-        decoder.convert(jsonString);
+double previouseLeftUpdateValue = 0;
+double previouseRightUpdateValue = 0;
+
+BluetoothCharacteristic? speedMotorLeft;
+BluetoothCharacteristic? speedMotorRight;
+BluetoothCharacteristic? directionMotorLeft;
+BluetoothCharacteristic? directionMotorRight;
+BluetoothCharacteristic? motorStop;
+BluetoothCharacteristic? inputSucceed;
+
+Map<String, BluetoothCharacteristic?> characteristics = {"a": speedMotorLeft, "b": speedMotorRight, "c": directionMotorLeft, "d": directionMotorRight, "e": motorStop, "f": inputSucceed};
 
 // offset controll of main listview
 ScrollController _scrollController = ScrollController();
@@ -34,17 +39,114 @@ double mainListViewScrollOffset = 0;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.portraitUp]).then((value) {
-  //   runApp(const MaterialApp(
-  //     title: 'Ble Robot',
-  //     home: ControlSliders(),
-  //   ));
-  // });
+  SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.portraitUp]);
 
   runApp(const MaterialApp(
     title: "Ble Robot Controller",
     home: ControlSliders(),
   ));
+}
+
+Future<bool> waitFor(callReady) async {
+  if (callReady) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+void updateMotorLeft(double speed) async {
+  int currentDirection;
+  if (speed > 10) {
+    currentDirection = 2;
+  } else if (speed < -10) {
+    currentDirection = 1;
+  } else {
+    currentDirection = 0;
+  }
+  speed = speed.abs();
+
+  if (leftDirection != currentDirection) {
+    updateDirectionLeftPending = true;
+  }
+  // print(callReady);
+  try {
+    if (updateDirectionLeftPending) {
+      if (await waitFor(callReady)) {
+        await directionMotorLeft?.write([currentDirection], withoutResponse: true);
+        callReady = false;
+
+        inputSucceed?.value.listen((value) {
+          callReady = true;
+          updateDirectionLeftPending = false;
+          leftDirection = currentDirection;
+        });
+      }
+    }
+
+    // await speedMotorLeft?.write([speed.toInt()], withoutResponse: true);
+    if (previouseLeftUpdateValue + 10 < speed || previouseLeftUpdateValue - 10 > speed) {
+      if (await waitFor(callReady)) {
+        await speedMotorLeft?.write([speed.toInt()], withoutResponse: true);
+        callReady = false;
+
+        inputSucceed?.value.listen((value) {
+          callReady = true;
+          previouseLeftUpdateValue = speed;
+        });
+      }
+    }
+  } catch (e) {
+    //
+  }
+  return;
+}
+
+void updateMotorRight(double speed) async {
+  int currentDirection;
+  if (speed > 10) {
+    currentDirection = 2;
+  } else if (speed < -10) {
+    currentDirection = 1;
+  } else {
+    currentDirection = 0;
+  }
+  speed = speed.abs();
+  
+
+  if (rightDirection != currentDirection) {
+    updateDirectionRightPending = true;
+  }
+  try {
+    if (updateDirectionRightPending) {
+      if (await waitFor(callReady)) {
+        await directionMotorRight?.write([currentDirection], withoutResponse: true);
+        callReady = false;
+
+        inputSucceed?.value.listen((value) {
+          callReady = true;
+          updateDirectionRightPending = false;
+          rightDirection = currentDirection;
+        });
+      }
+    }
+
+    // await speedMotorLeft?.write([speed.toInt()], withoutResponse: true);
+    if (previouseRightUpdateValue + 10 < speed || previouseRightUpdateValue - 10 > speed) {
+      if (await waitFor(callReady)) {
+        await speedMotorRight?.write([speed.toInt()], withoutResponse: true);
+        callReady = false;
+
+        inputSucceed?.value.listen((value) {
+          callReady = true;
+          previouseRightUpdateValue = speed;
+        });
+      }
+    }
+  } catch (e) {
+    //
+  }
+  return;
 }
 
 class ControlSliders extends StatefulWidget {
@@ -73,14 +175,17 @@ class _ControlSlidersState extends State<ControlSliders> {
                 inactiveColor: Colors.blue,
                 divisions: 200,
                 onChanged: (double value) {
+                  Future(() => updateMotorLeft(currentSliderValueLeft));
+
                   setState(() {
                     currentSliderValueLeft = value.roundToDouble();
                   });
                 },
-                 onChangeEnd: (double value) {
+                onChangeEnd: (double value) {
                   setState(() {
                     currentSliderValueLeft = 0;
                   });
+                  Future(() => updateMotorLeft(currentSliderValueLeft));
                 },
               ),
             ),
@@ -129,11 +234,13 @@ class _ControlSlidersState extends State<ControlSliders> {
                   setState(() {
                     currentSliderValueRight = value.roundToDouble();
                   });
+                  Future(() => updateMotorRight(currentSliderValueRight));
                 },
                 onChangeEnd: (double value) {
                   setState(() {
                     currentSliderValueRight = 0;
                   });
+                  Future(() => updateMotorRight(currentSliderValueRight));
                 },
               ),
             ),
@@ -158,8 +265,31 @@ connectTo(robot) async {
   // FlutterBlue ble = FlutterBlue.instance;
   // await BluetoothDevice.fromProto(robot).connect();
   await robot.connect(timeout: const Duration(seconds: 15), autoConnect: false);
+  var robotServices = await robot.discoverServices();
+  for (var service in robotServices) {
+    if (service.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd99") {
+      for (int index = 0; index < service.characteristics.length; index++) {
+        BluetoothCharacteristic char = service.characteristics[index];
+        for (var lastDigitOfUuid in characteristics.keys) {
+          if (char.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd9$lastDigitOfUuid") {
+            characteristics[lastDigitOfUuid] = char;
+          }
+        }
+      }
+    }
+  }
+
+  speedMotorLeft = characteristics['a'];
+  speedMotorRight = characteristics['b'];
+  directionMotorLeft = characteristics['c'];
+  directionMotorRight = characteristics['d'];
+  motorStop = characteristics['e'];
+  inputSucceed = characteristics['f'];
+  await inputSucceed!.setNotifyValue(true);
+
   connectedRobotDevice = robot;
   robotConnected = true;
+  // await directionMotorLeft?.write([1], withoutResponse: true);
 }
 
 class BlueToothScreen extends StatefulWidget {
@@ -211,7 +341,6 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                           mainListViewScrollOffset = _scrollController.position.pixels;
                         });
                       }
-
                       return false;
                     },
 
@@ -291,9 +420,9 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                                             Future.delayed(
                                               Duration.zero,
                                               () async {
-                                                bleRobotInfo = "Robot found! Click to connect";
-
-                                                setState(() {});
+                                                setState(() {
+                                                  bleRobotInfo = "Robot found! Click to connect";
+                                                });
                                               },
                                             );
                                           }
@@ -356,26 +485,10 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                           : Container(),
                       ElevatedButton(
                           onPressed: () async {
-                            var robotServices = await connectedRobotDevice.discoverServices();
-
-                            for (var service in robotServices) {
-                              if (service.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd99") {
-                                // print(service.characteristics);
-                                var characteristics = service.characteristics;
-                                for (BluetoothCharacteristic char in characteristics) {
-                                  if (char.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd9c") {
-                                    await char.write([0x01], withoutResponse: true);
-                                  }
-                                  if (char.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd9f") {
-                                    await char.setNotifyValue(true);
-                                    char.value.listen((value) {
-                                      print(value);
-                                    });
-                                  if (char.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd9a") {}
-                                  }
-                                }
-                              }
-                            }
+                            await speedMotorLeft?.write([0x50], withoutResponse: true);
+                            inputSucceed?.value.listen((value) {
+                              callReady = true;
+                            });
                           },
                           child: const Text("data")),
                       ElevatedButton(
@@ -384,7 +497,6 @@ class BlueToothScreenState extends State<BlueToothScreen> {
 
                             for (var service in robotServices) {
                               if (service.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd99") {
-                                // print(service.characteristics);
                                 var characteristics = service.characteristics;
                                 for (BluetoothCharacteristic char in characteristics) {
                                   print(char);
