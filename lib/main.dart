@@ -1,29 +1,24 @@
+// ignore_for_file: prefer_final_fields
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue/flutter_blue.dart';
 import 'package:get/get.dart';
 import 'package:philips_robot/ble_controller.dart';
 
-// global vars {
+// global vars
 double currentSliderValueLeft = 0;
 double currentSliderValueRight = 0;
 const String bluetoothRobotName = "ble-robot";
 List robotList = [];
 int counter = 0;
-int leftDirection = 0;
-int rightDirection = 0;
 int selectedRobot = -1;
 bool robotConnected = false;
-var connectedRobotDevice;
+dynamic connectedRobotDevice;
 bool callReady = true;
 
-bool updateDirectionLeftPending = true;
-bool updateDirectionRightPending = true;
-bool stopMotorLeft = false;
-bool stopMotorRight = false;
-
-double previouseLeftUpdateValue = 0;
-double previouseRightUpdateValue = 0;
+bool sliderLeftUpdated = false;
+bool sliderRightUpdated = false;
 
 BluetoothCharacteristic? speedMotorLeft;
 BluetoothCharacteristic? speedMotorRight;
@@ -34,10 +29,15 @@ BluetoothCharacteristic? inputSucceed;
 
 Map<String, BluetoothCharacteristic?> characteristics = {"a": speedMotorLeft, "b": speedMotorRight, "c": directionMotorLeft, "d": directionMotorRight, "e": motorStop, "f": inputSucceed};
 
+MotorController? motorControlLeft;
+MotorController? motorControlRight;
+
 // offset controll of main listview
 ScrollController _scrollController = ScrollController();
 double mainListViewScrollOffset = 0;
-// }
+
+
+
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,219 +49,99 @@ void main() {
   ));
 }
 
-Future<bool> waitFor(callReady) async {
-  if (await callReady) {
-    return true;
-  } else {
-    return false;
-  }
-}
-
 // Future<bool> waitFor(callReady) async {
-
-// }
-
-
-
-void updateMotorLeft(double speed) async {
-  int currentDirection;
-  if (speed > 10) {
-    currentDirection = 2;
-  } else if (speed < -10) {
-    currentDirection = 1;
-  } else {
-    currentDirection = 0;
-    speed = 0;
-  }
-  speed = speed.abs();
-
-  if (leftDirection != currentDirection) {
-    updateDirectionLeftPending = true;
-  }
-  // print(callReady);
-  try {
-    if (updateDirectionLeftPending) {
-      if (await waitFor(callReady)) {
-        directionMotorLeft?.write([currentDirection], withoutResponse: true);
-        callReady = false;
-
-        inputSucceed?.value.listen((value) {
-          try {
-            if (value.first == 0) {
-              callReady = true;
-              updateDirectionLeftPending = false;
-              leftDirection = currentDirection;
-            }
-          } catch (e) {
-            //
-          }
-        });
-      }
-    }
-
-    if (previouseLeftUpdateValue + 10 < speed || previouseLeftUpdateValue - 10 > speed) {
-      if (await waitFor(callReady)) {
-        await speedMotorLeft?.write([speed.toInt()], withoutResponse: true);
-        callReady = false;
-
-        inputSucceed?.value.listen((value) {
-          try {
-            if (value.first == 0) {
-              callReady = true;
-              previouseLeftUpdateValue = speed;
-            }
-          } catch (e) {
-            //
-          }
-        });
-      }
-    }
-  } catch (e) {
-    //
-  }
-
-  if (stopMotorLeft) {
-    if (await waitFor(callReady)) {
-      await directionMotorLeft?.write([0], withoutResponse: true);
-      callReady = false;
-
-      inputSucceed?.value.listen((value) {
-        try {
-          if (value.first == 0) {
-            stopMotorLeft = false;
-
-            callReady = true;
-            updateDirectionLeftPending = false;
-            leftDirection = currentDirection;
-          }
-        } catch (e) {
-          //
-        }
-      });
-    }
-  }
-  return;
-}
-
-void updateMotorRight(double speed) async {
-  int currentDirection;
-  if (speed > 10) {
-    currentDirection = 2;
-  } else if (speed < -10) {
-    currentDirection = 1;
-  } else {
-    currentDirection = 0;
-    speed = 0;
-  }
-  speed = speed.abs();
-
-  if (rightDirection != currentDirection) {
-    updateDirectionRightPending = true;
-  }
-  try {
-    if (updateDirectionRightPending) {
-      if (await waitFor(callReady)) {
-        await directionMotorRight?.write([currentDirection], withoutResponse: true);
-        callReady = false;
-
-        inputSucceed?.value.listen((value) {
-          try {
-            if (value.first == 0) {
-              callReady = true;
-              updateDirectionRightPending = false;
-              rightDirection = currentDirection;
-            }
-          } catch (e) {
-            //
-          }
-        });
-      }
-    }
-
-    // await speedMotorLeft?.write([speed.toInt()], withoutResponse: true);
-    if (previouseRightUpdateValue + 10 < speed || previouseRightUpdateValue - 10 > speed) {
-      if (await waitFor(callReady)) {
-        await speedMotorRight?.write([speed.toInt()], withoutResponse: true);
-        callReady = false;
-
-        inputSucceed?.value.listen((value) {
-          try {
-            if (value.first == 0) {
-              callReady = true;
-              previouseRightUpdateValue = speed;
-            }
-          } catch (e) {
-            //
-          }
-        });
-      }
-    }
-  } catch (e) {
-    //
-  }
-
-  if (stopMotorRight) {
-    if (await waitFor(callReady)) {
-      await directionMotorRight?.write([0], withoutResponse: true);
-      callReady = false;
-
-      inputSucceed?.value.listen((value) {
-        try {
-          if (value.first == 0) {
-            callReady = true;
-            stopMotorRight = false;
-            updateDirectionRightPending = false;
-            rightDirection = currentDirection;
-          }
-        } catch (e) {
-          //
-        }
-      });
-    }
-  }
-  return;
-}
-
-// void stopMotor(motorL, motorR) async {
-//   while (true) {
-
-//     if (await waitFor(callReady)) {
-//       if (motorL) {
-//         await directionMotorLeft?.write([0x00]);
-//         }
-//       if (motorR) {
-//         await directionMotorRight?.write([0x00]);
-//       }
-//       inputSucceed?.value.listen((value) {
-//         try {
-//           if (value.first == 0) {
-//             callReady = true;
-//           }
-//         } catch (e) {
-//           //
-//         }
-
-//       });
-//     }
+//   if (await callReady) {
+//     return true;
+//   } else {
+//     return false;
 //   }
 // }
 
-dowhiletest() async {
-  print("in here");
+Future waitFor(bool waitingFor, {int milliseconds = 10}) async {
   await Future.doWhile(() async {
-    await Future.delayed(const Duration(milliseconds: 20));
-    print("redo test");
-    if (callReady) {
-      print("motor update 0");
-      updateMotorLeft(0);
-
+    await Future.delayed(Duration(milliseconds: milliseconds));
+    if (waitingFor) {
       return false;
     } else {
-      print("test not succesfull");
       return true;
     }
-    // });
   });
+  return true;
+}
+
+class MotorController {
+  BluetoothCharacteristic? _speedMotor, _directionMotor;
+  int _previousMotorSpeed = 0;
+  int _previousMotorDirection = 0;
+  bool _updateMotorPending = false;
+
+  MotorController(BluetoothCharacteristic speedMotorChar, BluetoothCharacteristic directionMotorChar) {
+    _speedMotor = speedMotorChar;
+    _directionMotor = directionMotorChar;
+  }
+
+  int calculateNewValueOfInput(double speed) {
+    int currentDirection;
+    if (speed > 10) {
+      currentDirection = 2;
+    } else if (speed < -10) {
+      currentDirection = 1;
+    } else {
+      currentDirection = 0;
+    }
+    return currentDirection;
+  }
+
+  Future<void> communicateToRobot(BluetoothCharacteristic? writeChar, int writeData) async {
+    await waitFor(callReady);
+    callReady = false;
+    await writeChar?.write([writeData], withoutResponse: true);
+
+    inputSucceed?.value.listen(
+      (value) {
+        try {
+          if (value.first == 0) {
+            callReady = true;
+            return;
+          }
+        } catch (e) {
+          //
+        }
+      },
+    );
+  }
+
+  void callUpdate(double speed) async {
+    if (callReady) {
+      int currentDirection = calculateNewValueOfInput(speed);
+      int motorSpeed = speed.abs().toInt();
+      if (_previousMotorDirection != currentDirection) {
+        _updateMotorPending = true;
+      }
+      if (_updateMotorPending) {
+        await communicateToRobot(_directionMotor, currentDirection);
+        _updateMotorPending = false;
+        _previousMotorDirection = currentDirection;
+      }
+
+      if (_previousMotorSpeed + 10 < motorSpeed || _previousMotorSpeed - 10 > motorSpeed || motorSpeed > 90) {
+        await communicateToRobot(_speedMotor, motorSpeed);
+        _previousMotorSpeed = motorSpeed;
+      }
+    }
+  }
+
+  Future<void> stopMotor() async {
+    await Future.doWhile(() async {
+      await Future.delayed(const Duration(milliseconds: 20));
+      if (callReady) {
+        await communicateToRobot(_directionMotor, 0);
+        return false;
+      } else {
+        return true;
+      }
+    });
+  }
 }
 
 class ControlSliders extends StatefulWidget {
@@ -290,25 +170,26 @@ class _ControlSlidersState extends State<ControlSliders> {
                 inactiveColor: Colors.blue,
                 divisions: 200,
                 onChanged: (double value) {
-                  if (callReady) {
-                    updateMotorLeft(currentSliderValueLeft);
-                  } else {
-                    print("call not ready");
-                  }
+                  sliderLeftUpdated = false;
+
                   setState(() {
                     currentSliderValueLeft = value.roundToDouble();
                   });
+                  if (callReady) {
+                    motorControlLeft!.callUpdate(currentSliderValueLeft);
+                    if (sliderRightUpdated) {
+                      motorControlRight!.callUpdate(currentSliderValueRight);
+                    }
+                  }
+                  sliderLeftUpdated = true;
                 },
                 onChangeEnd: (double value) {
                   setState(() {
                     currentSliderValueLeft = 0;
                   });
-                  if (callReady) {
-                    updateMotorLeft(0);
-                  } else {
-                    print("--------------------");
-                    Future(() async =>     dowhiletest());
-                
+                  motorControlLeft!.stopMotor();
+                  if (currentSliderValueRight == 0) {
+                    motorControlRight!.stopMotor();
                   }
                 },
               ),
@@ -339,6 +220,10 @@ class _ControlSlidersState extends State<ControlSliders> {
                       currentSliderValueLeft = 0;
                       currentSliderValueRight = 0;
                     });
+                    Future(() async {
+                      await motorControlLeft!.stopMotor();
+                      await motorControlRight!.stopMotor();
+                    });
                   },
                   child: const Text("Stop")),
             ],
@@ -355,22 +240,31 @@ class _ControlSlidersState extends State<ControlSliders> {
                 inactiveColor: Colors.blue,
                 divisions: 200,
                 onChanged: (double value) {
+                  sliderRightUpdated = false;
+
                   setState(() {
                     currentSliderValueRight = value.roundToDouble();
                   });
                   if (callReady) {
-                    updateMotorRight(currentSliderValueRight);
+                    motorControlRight!.callUpdate(currentSliderValueRight);
+                    if (sliderLeftUpdated) {
+                      motorControlLeft!.callUpdate(currentSliderValueLeft);
+                    }
                   }
+                  sliderRightUpdated = true;
                 },
                 onChangeEnd: (double value) {
                   setState(() {
                     currentSliderValueRight = 0;
                   });
-                  Future(() async => updateMotorRight(0));
+                  motorControlRight!.stopMotor();
+                  if (currentSliderValueLeft == 0) {
+                    motorControlLeft!.stopMotor();
+                  }
                 },
               ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -419,6 +313,9 @@ connectTo(robot) async {
   motorStop = characteristics['e'];
   inputSucceed = characteristics['f'];
   await inputSucceed!.setNotifyValue(true);
+
+  motorControlLeft = MotorController(speedMotorLeft!, directionMotorLeft!);
+  motorControlRight = MotorController(speedMotorRight!, directionMotorRight!);
 
   connectedRobotDevice = robot;
   robotConnected = true;
