@@ -36,9 +36,6 @@ MotorController? motorControlRight;
 ScrollController _scrollController = ScrollController();
 double mainListViewScrollOffset = 0;
 
-
-
-
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft]);
@@ -175,7 +172,7 @@ class _ControlSlidersState extends State<ControlSliders> {
                   setState(() {
                     currentSliderValueLeft = value.roundToDouble();
                   });
-                  if (callReady) {
+                  if (callReady && robotConnected) {
                     motorControlLeft!.callUpdate(currentSliderValueLeft);
                     if (sliderRightUpdated) {
                       motorControlRight!.callUpdate(currentSliderValueRight);
@@ -187,9 +184,11 @@ class _ControlSlidersState extends State<ControlSliders> {
                   setState(() {
                     currentSliderValueLeft = 0;
                   });
-                  motorControlLeft!.stopMotor();
-                  if (currentSliderValueRight == 0) {
-                    motorControlRight!.stopMotor();
+                  if (robotConnected) {
+                    motorControlLeft!.stopMotor();
+                    if (currentSliderValueRight == 0) {
+                      motorControlRight!.stopMotor();
+                    }
                   }
                 },
               ),
@@ -245,7 +244,7 @@ class _ControlSlidersState extends State<ControlSliders> {
                   setState(() {
                     currentSliderValueRight = value.roundToDouble();
                   });
-                  if (callReady) {
+                  if (callReady && robotConnected) {
                     motorControlRight!.callUpdate(currentSliderValueRight);
                     if (sliderLeftUpdated) {
                       motorControlLeft!.callUpdate(currentSliderValueLeft);
@@ -257,9 +256,11 @@ class _ControlSlidersState extends State<ControlSliders> {
                   setState(() {
                     currentSliderValueRight = 0;
                   });
-                  motorControlRight!.stopMotor();
-                  if (currentSliderValueLeft == 0) {
-                    motorControlLeft!.stopMotor();
+                  if (robotConnected) {
+                    motorControlRight!.stopMotor();
+                    if (currentSliderValueLeft == 0) {
+                      motorControlLeft!.stopMotor();
+                    }
                   }
                 },
               ),
@@ -282,8 +283,6 @@ int countRobotsFound(connections) {
 }
 
 connectTo(robot) async {
-  // FlutterBlue ble = FlutterBlue.instance;
-  // await BluetoothDevice.fromProto(robot).connect();
   await robot.connect(timeout: const Duration(seconds: 15), autoConnect: false);
 
   robot.mtu.elementAt(1).then((mtu) {
@@ -336,17 +335,12 @@ class BlueToothScreenState extends State<BlueToothScreen> {
     return Scaffold(
         appBar: AppBar(
           title: const Text("connect to your bluetooth robot"),
-          actions: [
-            FloatingActionButton(
+          leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded),
               onPressed: () {
                 SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft]);
                 Navigator.pop(context);
-              },
-              backgroundColor: Colors.red,
-              mini: true,
-              child: const Icon(Icons.cancel_outlined),
-            )
-          ],
+              }),
         ),
         body: GetBuilder<BleController>(
           init: BleController(),
