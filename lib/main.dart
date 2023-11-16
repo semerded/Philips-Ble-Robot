@@ -19,6 +19,8 @@ bool callReady = true;
 
 bool updateDirectionLeftPending = true;
 bool updateDirectionRightPending = true;
+bool stopMotorLeft = false;
+bool stopMotorRight = false;
 
 double previouseLeftUpdateValue = 0;
 double previouseRightUpdateValue = 0;
@@ -48,12 +50,18 @@ void main() {
 }
 
 Future<bool> waitFor(callReady) async {
-  if (callReady) {
+  if (await callReady) {
     return true;
   } else {
     return false;
   }
 }
+
+// Future<bool> waitFor(callReady) async {
+
+// }
+
+
 
 void updateMotorLeft(double speed) async {
   int currentDirection;
@@ -74,17 +82,16 @@ void updateMotorLeft(double speed) async {
   try {
     if (updateDirectionLeftPending) {
       if (await waitFor(callReady)) {
-        await directionMotorLeft?.write([currentDirection], withoutResponse: true);
+        directionMotorLeft?.write([currentDirection], withoutResponse: true);
         callReady = false;
 
         inputSucceed?.value.listen((value) {
           try {
-          if (value.first == 0) {
-         
-          callReady = true;
-          updateDirectionLeftPending = false;
-          leftDirection = currentDirection;
-          }
+            if (value.first == 0) {
+              callReady = true;
+              updateDirectionLeftPending = false;
+              leftDirection = currentDirection;
+            }
           } catch (e) {
             //
           }
@@ -92,26 +99,46 @@ void updateMotorLeft(double speed) async {
       }
     }
 
-    // await speedMotorLeft?.write([speed.toInt()], withoutResponse: true);
     if (previouseLeftUpdateValue + 10 < speed || previouseLeftUpdateValue - 10 > speed) {
       if (await waitFor(callReady)) {
         await speedMotorLeft?.write([speed.toInt()], withoutResponse: true);
         callReady = false;
 
         inputSucceed?.value.listen((value) {
-            try {
-          if (value.first == 0) {
-            callReady = true;
-            previouseLeftUpdateValue = speed;
-          }
-            } catch (e) {
-              //
+          try {
+            if (value.first == 0) {
+              callReady = true;
+              previouseLeftUpdateValue = speed;
             }
+          } catch (e) {
+            //
+          }
         });
       }
     }
   } catch (e) {
     //
+  }
+
+  if (stopMotorLeft) {
+    if (await waitFor(callReady)) {
+      await directionMotorLeft?.write([0], withoutResponse: true);
+      callReady = false;
+
+      inputSucceed?.value.listen((value) {
+        try {
+          if (value.first == 0) {
+            stopMotorLeft = false;
+
+            callReady = true;
+            updateDirectionLeftPending = false;
+            leftDirection = currentDirection;
+          }
+        } catch (e) {
+          //
+        }
+      });
+    }
   }
   return;
 }
@@ -139,12 +166,11 @@ void updateMotorRight(double speed) async {
 
         inputSucceed?.value.listen((value) {
           try {
-          if (value.first == 0) {
-
-          callReady = true;
-          updateDirectionRightPending = false;
-          rightDirection = currentDirection;
-          }
+            if (value.first == 0) {
+              callReady = true;
+              updateDirectionRightPending = false;
+              rightDirection = currentDirection;
+            }
           } catch (e) {
             //
           }
@@ -159,26 +185,46 @@ void updateMotorRight(double speed) async {
         callReady = false;
 
         inputSucceed?.value.listen((value) {
-        try {
-          if (value.first == 0) {
-            callReady = true;
-            previouseRightUpdateValue = speed;
+          try {
+            if (value.first == 0) {
+              callReady = true;
+              previouseRightUpdateValue = speed;
+            }
+          } catch (e) {
+            //
           }
-        } catch (e) {
-          //
-        }
         });
       }
     }
   } catch (e) {
     //
   }
+
+  if (stopMotorRight) {
+    if (await waitFor(callReady)) {
+      await directionMotorRight?.write([0], withoutResponse: true);
+      callReady = false;
+
+      inputSucceed?.value.listen((value) {
+        try {
+          if (value.first == 0) {
+            callReady = true;
+            stopMotorRight = false;
+            updateDirectionRightPending = false;
+            rightDirection = currentDirection;
+          }
+        } catch (e) {
+          //
+        }
+      });
+    }
+  }
   return;
 }
 
 // void stopMotor(motorL, motorR) async {
 //   while (true) {
- 
+
 //     if (await waitFor(callReady)) {
 //       if (motorL) {
 //         await directionMotorLeft?.write([0x00]);
@@ -199,9 +245,27 @@ void updateMotorRight(double speed) async {
 //     }
 //   }
 // }
+
+dowhiletest() async {
+  print("in here");
+  await Future.doWhile(() async {
+    await Future.delayed(const Duration(milliseconds: 20));
+    print("redo test");
+    if (callReady) {
+      print("motor update 0");
+      updateMotorLeft(0);
+
+      return false;
+    } else {
+      print("test not succesfull");
+      return true;
+    }
+    // });
+  });
+}
+
 class ControlSliders extends StatefulWidget {
   const ControlSliders({super.key});
-  
 
   @override
   State<ControlSliders> createState() => _ControlSlidersState();
@@ -226,8 +290,11 @@ class _ControlSlidersState extends State<ControlSliders> {
                 inactiveColor: Colors.blue,
                 divisions: 200,
                 onChanged: (double value) {
-              updateMotorLeft(currentSliderValueLeft);
-
+                  if (callReady) {
+                    updateMotorLeft(currentSliderValueLeft);
+                  } else {
+                    print("call not ready");
+                  }
                   setState(() {
                     currentSliderValueLeft = value.roundToDouble();
                   });
@@ -236,7 +303,13 @@ class _ControlSlidersState extends State<ControlSliders> {
                   setState(() {
                     currentSliderValueLeft = 0;
                   });
-                  Future(() async => updateMotorRight(0));
+                  if (callReady) {
+                    updateMotorLeft(0);
+                  } else {
+                    print("--------------------");
+                    Future(() async =>     dowhiletest());
+                
+                  }
                 },
               ),
             ),
@@ -249,7 +322,6 @@ class _ControlSlidersState extends State<ControlSliders> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) {
-                      
                       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
                       return const BlueToothScreen();
                     }),
@@ -286,7 +358,9 @@ class _ControlSlidersState extends State<ControlSliders> {
                   setState(() {
                     currentSliderValueRight = value.roundToDouble();
                   });
-                  updateMotorRight(currentSliderValueRight);
+                  if (callReady) {
+                    updateMotorRight(currentSliderValueRight);
+                  }
                 },
                 onChangeEnd: (double value) {
                   setState(() {
@@ -318,12 +392,12 @@ connectTo(robot) async {
   // await BluetoothDevice.fromProto(robot).connect();
   await robot.connect(timeout: const Duration(seconds: 15), autoConnect: false);
 
-    robot.mtu.elementAt(1).then((mtu) {
-      mtu = mtu < 23 ? 20 : mtu - 3; // failsafe by always assuming an ATT MTU and not a DATA MTU
-      // do your service discovery
-      robot.discoverServices();
-    });
-await robot.requestMtu(512);
+  robot.mtu.elementAt(1).then((mtu) {
+    mtu = mtu < 23 ? 20 : mtu - 3; // failsafe by always assuming an ATT MTU and not a DATA MTU
+// do your service discovery
+    robot.discoverServices();
+  });
+  await robot.requestMtu(512);
   var robotServices = await robot.discoverServices();
   for (var service in robotServices) {
     if (service.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd99") {
@@ -541,40 +615,6 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                                 "Disconnect",
                               ))
                           : Container(),
-                      ElevatedButton(
-                          onPressed: () async {
-                            await speedMotorLeft?.write([0x50], withoutResponse: true);
-                            inputSucceed?.value.listen((value) {
-                              callReady = true;
-                            });
-                          },
-                          child: const Text("data")),
-                      ElevatedButton(
-                          onPressed: () async {
-                            var robotServices = await connectedRobotDevice.discoverServices();
-
-                            for (var service in robotServices) {
-                              if (service.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd99") {
-                                var characteristics = service.characteristics;
-                                for (BluetoothCharacteristic char in characteristics) {
-                                  print(char);
-                                  print("-----------------------");
-
-                                  if (char.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd9a") {
-                                    await char.write([0x32], withoutResponse: true);
-                                  }
-
-                                  if (char.uuid.toString() == "c9261765-1076-41ac-82d7-a454e801bd9f") {
-                                    await char.setNotifyValue(true);
-                                    char.value.listen((value) {
-                                      print(value);
-                                    });
-                                  }
-                                }
-                              }
-                            }
-                          },
-                          child: const Text("data2"))
                     ],
                   )
                 ],
