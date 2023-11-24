@@ -44,7 +44,7 @@ void main() {
   ));
 }
 
-void connectTo(robot) async {
+void makeConnectionWithRobot(robot) async {
   // TODO try except
   await robot.connect(timeout: const Duration(seconds: 15), autoConnect: false);
 
@@ -204,7 +204,7 @@ class _ControlSlidersState extends State<ControlSliders> {
                       MaterialPageRoute(
                         builder: (context) {
                           SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-                          return const _UserInfo();
+                          return const _UserManualPage();
                         },
                       ),
                     ),
@@ -396,7 +396,16 @@ class BlueToothScreenState extends State<BlueToothScreen> {
                                     tileColor: selectedRobot == index ? Colors.green : Colors.white,
                                     title: Text(data.device.name.toString()),
                                     subtitle: Text(data.device.id.id.toString()),
-                                    trailing: selectedRobot == index ? ElevatedButton(onPressed: () => connectTo(data.device), child: const Text("Connect to robot")) : const Text(""),
+                                    trailing: selectedRobot == index
+                                        ? ElevatedButton(
+                                            // TODO test on phone
+                                            onPressed: () {
+                                              setState(() {
+                                                makeConnectionWithRobot(data.device);
+                                              });
+                                            },
+                                            child: const Text("Connect to robot"))
+                                        : const Text(""),
                                     onTap: () {
                                       setState(() {
                                         if (selectedRobot == index) {
@@ -496,9 +505,15 @@ class BlueToothScreenState extends State<BlueToothScreen> {
   }
 }
 
-class _UserInfo extends StatelessWidget {
-  const _UserInfo();
+class _UserManualPage extends StatefulWidget {
+  const _UserManualPage();
 
+  @override
+  State<_UserManualPage> createState() => _UserManualPageState();
+}
+
+class _UserManualPageState extends State<_UserManualPage> {
+  double dummySlider = 0;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -515,10 +530,64 @@ class _UserInfo extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(12.0),
         children: [
-          _header("Control UI"),
-          const Text(""),
+          _header("Control UI", fontSize: 50),
           _dividingLine(),
-          _header(""),
+          const Text("The UI is build out of 2 elements:\n\t\t\t\t\t\t- The sliders to control the robot\n\t\t\t\t\t\t- The buttons to adjust small things to the robot"),
+
+          ///
+          /// dummy slider
+          ///
+          _dividingLine(),
+          _header("Slider"),
+          const Text("The slider controls the robot, 1 slider for each motor (configurable*).\n <-- Move the slider to the red side to drive backwards.\n --> Move the slider to the blue side to drive forwards."),
+          const Text("\nThe slider will jump back to 0 after you let your finger go of the slider\n"),
+
+          SliderTheme(
+            data: const SliderThemeData(
+                trackHeight: 50,
+                activeTrackColor: Colors.red,
+                inactiveTickMarkColor: Colors.white,
+                inactiveTrackColor: Colors.blue,
+                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 30, elevation: 5),
+                trackShape: RoundedRectSliderTrackShape(),
+                tickMarkShape: RoundSliderTickMarkShape(tickMarkRadius: 5)),
+            child: Slider(
+              value: dummySlider,
+              min: -100,
+              max: 100,
+              onChanged: (value) {
+                setState(() {
+                  dummySlider = value;
+                });
+              },
+              onChangeEnd: (value) {
+                setState(() {
+                  dummySlider = 0;
+                });
+              },
+            ),
+          ),
+          _header("*everything that is configurable means that it can be changed with the buttons in the middle of the screen", fontSize: 10), // not a header but a sidenote
+
+          _dividingLine(),
+          _header("Control buttons"),
+          _header("Some buttons, when activated, have a green border\n", fontSize: 12), // side note
+          _userManualButtonExplained(Icons.arrow_upward, Colors.green, "This button flips your screen, it wil also point at the top of your screen to orientate in which direction you have to hold your phone"),
+          _userManualButtonExplained(Icons.flip_camera_android_outlined, Colors.orange, "This button changes the front of the robot (only software)."),
+          _userManualButtonExplained(Icons.speed, Colors.yellow, "This button changes the slider input from a digital feel (0 or 100/on or off) to an analog feel (divided per 10%)"),
+          _userManualButtonExplained(Icons.control_camera, Colors.red,
+              "This button switches the gyrosteering on and off.\nThe gyrosteering enables you to control the robot with the orientation of your phone. In other words: you can use your phone as a steering wheel. When on, the sliders become unified as 1 throttle slider."),
+          _userManualButtonExplained(
+              Icons.bluetooth, Colors.blue, "The bigger button is the bluetooth button. It also shows the bluetooth status: a cross when not connected and a checkmark when connected.\nPress this button to open the bluetooth screen (read below ↓)"),
+          _dividingLine(),
+          _header("Bluetooth configuration screen", fontSize: 50),
+          _dividingLine(),
+          const Text("The main goal here is to connect your robot to the app. So you CAN only connect your robot here, nothing else\n"),
+          const Text("You have 2 tabs, 1 where only the robots show up, the other one with all bluetooth connections in your area. You only have to be on the first tab.\n"),
+          const Text("Press the most left button on the robot (button 1) to make the robot visible to other bluetooth devices. A green led will flicker."),
+          const Text("Press the green connect button to start connecting. The app searches 15 seconds for your robot, if not found try again or press the i button to start troubleshooting."),
+          const Text("When a robot is found it will show in the first tab. Press on the desired robot and click connect. A bright green led will light up on the robot.\n"),
+          const Text("When the robot is connected you can go back to the home page, you can also disconnect your robot here.")
         ],
       ),
     );
@@ -620,15 +689,42 @@ Widget _dividingLine() {
   );
 }
 
-Widget _header(String headerText) {
+Widget _header(String headerText, {double fontSize = 26}) {
   return Padding(
     padding: const EdgeInsets.only(bottom: 10),
     child: Text(
       headerText,
-      style: const TextStyle(
-        fontSize: 26,
+      style: TextStyle(
+        fontSize: fontSize,
         fontWeight: FontWeight.bold,
       ),
     ),
+  );
+}
+
+Widget _userManualButtonExplained(IconData icon, MaterialColor color, String text) {
+  return Padding(
+    padding: const EdgeInsets.all(8.0),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [_userManualFloatingActionButton(icon, color), _userManualFlexText(text)],
+    ),
+  );
+}
+
+Widget _userManualFloatingActionButton(IconData icon, MaterialColor color) {
+  return Padding(
+    padding: const EdgeInsets.only(left: 12, right: 10, bottom: 30),
+    child: FloatingActionButton(
+      onPressed: null,
+      backgroundColor: color,
+      child: Icon(icon),
+    ),
+  );
+}
+
+Widget _userManualFlexText(String text) {
+  return Flexible(
+    child: Text(text),
   );
 }
