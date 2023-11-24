@@ -253,8 +253,13 @@ class _ControlSlidersState extends State<ControlSliders> {
                   /// change robot drive direction
                   ///
                   FloatingActionButton(
-                    onPressed: () => reverseRobot = !reverseRobot,
+                    onPressed: () {
+                      setState(() {
+                        reverseRobot = !reverseRobot;
+                      });
+                    },
                     backgroundColor: Colors.orange,
+                    shape: reverseRobot ? RoundedRectangleBorder(side: const BorderSide(width: 3, color: Colors.green), borderRadius: BorderRadius.circular(100)) : null,
                     child: const Icon(Icons.flip_camera_android_outlined),
                   ),
 
@@ -269,6 +274,7 @@ class _ControlSlidersState extends State<ControlSliders> {
                         currentSliderValueRight = 0;
                       });
                     },
+                    shape: divisions == 20 ? RoundedRectangleBorder(side: const BorderSide(width: 3, color: Colors.green), borderRadius: BorderRadius.circular(100)) : null,
                     backgroundColor: Colors.yellow,
                     child: const Icon(Icons.speed),
                   ),
@@ -286,6 +292,7 @@ class _ControlSlidersState extends State<ControlSliders> {
                       });
                     },
                     backgroundColor: Colors.red,
+                    shape: gyroControl ? RoundedRectangleBorder(side: const BorderSide(width: 3, color: Colors.green), borderRadius: BorderRadius.circular(100)) : null,
                     child: const Icon(Icons.control_camera),
                   )
                 ],
@@ -295,16 +302,16 @@ class _ControlSlidersState extends State<ControlSliders> {
           Container(
             margin: const EdgeInsets.only(left: 200, top: 10, bottom: 10),
             child: RotatedBox(
-              quarterTurns: 3,
-              child: SliderTheme(
-                data: const SliderThemeData(
-                    trackHeight: 50,
-                    activeTrackColor: Colors.red,
-                    inactiveTickMarkColor: Colors.white,
-                    inactiveTrackColor: Colors.blue,
-                    thumbShape: RoundSliderThumbShape(enabledThumbRadius: 30, elevation: 5),
-                    trackShape: RoundedRectSliderTrackShape(),
-                    tickMarkShape: RoundSliderTickMarkShape(tickMarkRadius: 5)),
+                quarterTurns: 3,
+                child: SliderTheme(
+                  data: const SliderThemeData(
+                      trackHeight: 50,
+                      activeTrackColor: Colors.red,
+                      inactiveTickMarkColor: Colors.white,
+                      inactiveTrackColor: Colors.blue,
+                      thumbShape: RoundSliderThumbShape(enabledThumbRadius: 30, elevation: 5),
+                      trackShape: RoundedRectSliderTrackShape(),
+                      tickMarkShape: RoundSliderTickMarkShape(tickMarkRadius: 5)),
                   child: Slider(
                     value: gyroControl ? currentSliderValueLeft : currentSliderValueRight,
                     min: -100,
