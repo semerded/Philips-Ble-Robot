@@ -159,7 +159,7 @@ class _ControlSlidersState extends State<ControlSliders> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            margin: const EdgeInsets.only(right: 200),
+            margin: const EdgeInsets.only(right: 200, top: 10, bottom: 10),
             child: RotatedBox(
               quarterTurns: 3,
               child: SliderTheme(
@@ -168,9 +168,9 @@ class _ControlSlidersState extends State<ControlSliders> {
                     activeTrackColor: Colors.red,
                     inactiveTickMarkColor: Colors.white,
                     inactiveTrackColor: Colors.blue,
-                    thumbShape: RoundSliderThumbShape(enabledThumbRadius: 13.0, disabledThumbRadius: 13.0),
+                    thumbShape: RoundSliderThumbShape(enabledThumbRadius: 30, elevation: 5),
                     trackShape: RoundedRectSliderTrackShape(),
-                    tickMarkShape: RoundSliderTickMarkShape(tickMarkRadius: 4.0)),
+                    tickMarkShape: RoundSliderTickMarkShape(tickMarkRadius: 5)),
                 child: Slider(
                   value: currentSliderValueLeft,
                   min: -100,
@@ -194,6 +194,9 @@ class _ControlSlidersState extends State<ControlSliders> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Row(
+                ///
+                /// user manual
+                ///
                 children: [
                   FloatingActionButton(
                     onPressed: () => Navigator.push(
@@ -207,6 +210,10 @@ class _ControlSlidersState extends State<ControlSliders> {
                     ),
                     child: const Icon(Icons.info_outline),
                   ),
+
+                  ///
+                  /// change device orientation
+                  ///
                   FloatingActionButton(
                     onPressed: () {
                       screenFlip ? SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft]) : SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeRight]);
@@ -217,6 +224,10 @@ class _ControlSlidersState extends State<ControlSliders> {
                   ),
                 ],
               ),
+
+              ///
+              /// connect to bluetooth screen
+              ///
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
@@ -238,16 +249,25 @@ class _ControlSlidersState extends State<ControlSliders> {
               ),
               Row(
                 children: [
+                  ///
+                  /// change robot drive direction
+                  ///
                   FloatingActionButton(
                     onPressed: () => reverseRobot = !reverseRobot,
                     backgroundColor: Colors.orange,
                     child: const Icon(Icons.flip_camera_android_outlined),
                   ),
+
+                  ///
+                  /// change slider speed behaviour
+                  ///
                   FloatingActionButton(
                     onPressed: () {
-                      divisions == 2 ? divisions = 20 : divisions = 2;
-                      currentSliderValueLeft = 0;
-                      currentSliderValueRight = 0;
+                      setState(() {
+                        divisions == 2 ? divisions = 20 : divisions = 2;
+                        currentSliderValueLeft = 0;
+                        currentSliderValueRight = 0;
+                      });
                     },
                     backgroundColor: Colors.yellow,
                     child: const Icon(Icons.speed),
@@ -256,8 +276,15 @@ class _ControlSlidersState extends State<ControlSliders> {
               ),
               Row(
                 children: [
+                  ///
+                  /// switch gyro steering on/off
+                  ///
                   FloatingActionButton(
-                    onPressed: () => gyroControl = !gyroControl,
+                    onPressed: () {
+                      setState(() {
+                        gyroControl = !gyroControl;
+                      });
+                    },
                     backgroundColor: Colors.red,
                     child: const Icon(Icons.control_camera),
                   )
@@ -266,18 +293,18 @@ class _ControlSlidersState extends State<ControlSliders> {
             ],
           ),
           Container(
-            margin: const EdgeInsets.only(left: 200),
+            margin: const EdgeInsets.only(left: 200, top: 10, bottom: 10),
             child: RotatedBox(
-                quarterTurns: 3,
-                child: SliderTheme(
-                  data: const SliderThemeData(
-                      trackHeight: 50,
-                      activeTrackColor: Colors.red,
-                      inactiveTickMarkColor: Colors.white,
-                      inactiveTrackColor: Colors.blue,
-                      thumbShape: RoundSliderThumbShape(enabledThumbRadius: 13.0, disabledThumbRadius: 13.0),
-                      trackShape: RoundedRectSliderTrackShape(),
-                      tickMarkShape: RoundSliderTickMarkShape(tickMarkRadius: 4.0)),
+              quarterTurns: 3,
+              child: SliderTheme(
+                data: const SliderThemeData(
+                    trackHeight: 50,
+                    activeTrackColor: Colors.red,
+                    inactiveTickMarkColor: Colors.white,
+                    inactiveTrackColor: Colors.blue,
+                    thumbShape: RoundSliderThumbShape(enabledThumbRadius: 30, elevation: 5),
+                    trackShape: RoundedRectSliderTrackShape(),
+                    tickMarkShape: RoundSliderTickMarkShape(tickMarkRadius: 5)),
                   child: Slider(
                     value: gyroControl ? currentSliderValueLeft : currentSliderValueRight,
                     min: -100,
@@ -294,6 +321,9 @@ class _ControlSlidersState extends State<ControlSliders> {
                     },
                     onChangeEnd: (double value) async {
                       setState(() {
+                        if (gyroControl) {
+                          currentSliderValueLeft = 0;
+                        }
                         currentSliderValueRight = 0;
                       });
                     },
